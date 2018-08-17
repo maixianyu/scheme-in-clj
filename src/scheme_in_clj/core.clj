@@ -187,3 +187,32 @@
 (defn cond->if [exp]
   (expand-clauses (cond-clauses exp)))
 
+; ---- environment ----
+(defn enclosing-environment [env]
+  (cdr env))
+
+(defn first-frame [env]
+  (car env))
+
+(def the-empty-environment '())
+
+(defn make-frame [variables values]
+  (atom (cons variables values)))
+
+(defn frame-variables [frame]
+  (car @frame))
+
+(defn frame-values [frame]
+  (cdr @frame))
+
+(defn add-binding-to-frame! [variable value frame]
+  (reset! frame (cons (cons variable (frame-variables frame)) (cons value (frame-values frame)))))
+
+(defn extend-environment [variables values base-env]
+  (if (= (count variables) (count values))
+    (cons (make-frame variables values) base-env)
+    (if (> (count variables) (count values))
+      (throw (IllegalArgumentException. "Too many arguments supplied"))
+      (throw (IllegalArgumentException. "Too many values supplied")))))
+
+(extend-environment (list :a) (list 1) '())
