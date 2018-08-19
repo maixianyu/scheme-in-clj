@@ -197,16 +197,23 @@
 (def the-empty-environment '())
 
 (defn make-frame [variables values]
-  (atom (cons variables values)))
+  (loop [map-rec {}
+         var-tmp variables
+         val-tmp values]
+    (if (nil? var-tmp)
+      (atom map-rec)
+      (recur (assoc map-rec (car var-tmp) (car val-tmp))
+             (next var-tmp)
+             (next val-tmp)))))
 
 (defn frame-variables [frame]
-  (car @frame))
+  (keys @frame))
 
 (defn frame-values [frame]
-  (cdr @frame))
+  (vals @frame))
 
 (defn add-binding-to-frame! [variable value frame]
-  (reset! frame (cons (cons variable (frame-variables frame)) (cons value (frame-values frame)))))
+  (reset! frame (assoc @frame variable value)))
 
 (defn extend-environment [variables values base-env]
   (if (= (count variables) (count values))
@@ -215,4 +222,21 @@
       (throw (IllegalArgumentException. "Too many arguments supplied"))
       (throw (IllegalArgumentException. "Too many values supplied")))))
 
-(extend-environment (list :a) (list 1) '())
+(defn lookup-variable-value [var env]
+  (cond
+    (nil? env) (throw (Exception. (str "Unbound variable " var)))
+    (nil? (get @(car env) var)) (lookup-variable-value var (cdr env))
+    :else (get @(car env) var)))
+
+(defn set-variable-value! [_var _val env]
+  (cond
+    (nil? env) (throw (Exception. (str "Unbound variable " _var)))
+    (nil? (get @(car env) _var)) (set-variable-value! _var _val (cdr env))
+    :else (swap! (car env) #(assoc % _var _val))))
+
+(defn define-variable! [_var _val env]
+  (loop [tmp-env env]
+    (cond
+      (nil? tmp-env) (add-binding-to-frame! _var _val (car env))
+      (nil? (get @(car tmp-env) _var)) (recur (cdr tmp-env))
+      :else (swap! (car tmp-env) #(assoc % _var _val)))))
