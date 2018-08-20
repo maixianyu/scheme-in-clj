@@ -240,3 +240,72 @@
       (nil? tmp-env) (add-binding-to-frame! _var _val (car env))
       (nil? (get @(car tmp-env) _var)) (recur (cdr tmp-env))
       :else (swap! (car tmp-env) #(assoc % _var _val)))))
+
+; ---- predicate ----
+(defn true? [x]
+  (= x true))
+
+(defn false? [x]
+  (= x false))
+
+; ---- procedure ----
+(defn make-procedure [parameters body env]
+  (list 'procedure parameters body env))
+
+(defn compound-procedure? [p]
+  (tagged-list? p 'procedure))
+
+(defn procedure-parameters [p]
+  (cadr p))
+
+(defn procedure-body [p]
+  (caddr p))
+
+(defn procedure-env [p]
+  (cadddr p))
+
+; primitive procedure
+(defn primitive-procedure? [proc]
+  (tagged-list? proc 'primitive))
+
+(defn primitive-implementation [proc]
+  (cadr proc))
+
+(def primitive-procedures
+  (list (list 'car car)
+        (list 'cdr cdr)
+        (list 'cons cons)
+        (list 'null? nil?)))
+
+(def primitive-procedure-names
+  (map car primitive-procedures))
+
+(def primitive-procedure-objects
+  (map #(list 'primitive (cadr %))
+       primitive-procedures))
+
+(def setup-environment
+  (let [initial-env (extend-environment primitive-procedure-names
+                                        primitive-procedure-objects
+                                        the-empty-environment)]
+    (define-variable! 'true true initial-env)
+    (define-variable! 'false false initial-env)
+    initial-env))
+
+(def the-global-environment setup-environment)
+
+; apply-in-underlying-clojure
+(def apply-in-underlying-clojure apply)
+(def eval-in-underlying-clojure eval)
+
+(defn apply-primitive-procedure [proc args]
+  (apply-in-underlying-clojure (primitive-implementation proc)
+                               args))
+
+; procedure args
+(declare eval)
+
+(defn list-of-values [exps env]
+  (if (no-operands? exps)
+    '()
+    (map #(eval % env) (operands exps))))
