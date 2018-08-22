@@ -222,6 +222,10 @@
       (throw (IllegalArgumentException. "Too many arguments supplied"))
       (throw (IllegalArgumentException. "Too many values supplied")))))
 
+
+(cons (make-frame '(:a) '(1)) '())
+(extend-environment '(:a) '(1) '())
+
 (defn lookup-variable-value [var env]
   (cond
     (nil? env) (throw (Exception. (str "Unbound variable " var)))
@@ -330,8 +334,8 @@
   'ok)
 
 (defn eval-definition [exp env]
-  (define-variable! (definition-value exp)
-    (eval (definition-value) env)
+  (define-variable! (definition-variable exp)
+    (eval (definition-value exp) env)
     env)
   'ok)
 
@@ -362,3 +366,33 @@
     (application? exp) (apply (eval (operator exp) env)
                               (list-of-values (operands exp) env))
     :else (throw (Exception. (str "Unknow expression type -- EVAL" exp)))))
+
+; input and output
+(def input-prompt ";;; M-Eval input:")
+(def output-prompt ";;; M-Eval output:")
+
+(defn prompt-for-input [string]
+  (println string))
+
+(defn announce-output [string]
+  (print string))
+
+(defn user-print [object]
+  (if (compound-procedure? object)
+    (print (list 'compound-procedure
+                 (procedure-parameters object)
+                 (procedure-body object)
+                 '<procedure-env>))
+    (do (print object) (newline))))
+
+
+(defn driver-loop []
+  (prompt-for-input input-prompt)
+  (let [input (read)]
+    (let [output (eval input the-global-environment)]
+      (announce-output output-prompt)
+      (user-print output)))
+  (recur))
+
+
+(driver-loop)
