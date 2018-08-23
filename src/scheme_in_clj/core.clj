@@ -219,12 +219,9 @@
   (if (= (count variables) (count values))
     (cons (make-frame variables values) base-env)
     (if (> (count variables) (count values))
-      (throw (IllegalArgumentException. "Too many arguments supplied"))
+      (throw (IllegalArgumentException. (str "Too many arguments supplied" ", " variables ", " (count variables) ", " values ", " (count values))))
       (throw (IllegalArgumentException. "Too many values supplied")))))
 
-
-(cons (make-frame '(:a) '(1)) '())
-(extend-environment '(:a) '(1) '())
 
 (defn lookup-variable-value [var env]
   (cond
@@ -239,11 +236,10 @@
     :else (swap! (car env) #(assoc % _var _val))))
 
 (defn define-variable! [_var _val env]
-  (loop [tmp-env env]
-    (cond
-      (nil? tmp-env) (add-binding-to-frame! _var _val (car env))
-      (nil? (get @(car tmp-env) _var)) (recur (cdr tmp-env))
-      :else (swap! (car tmp-env) #(assoc % _var _val)))))
+  (if (nil? env)
+    (add-binding-to-frame! _var _val (first-frame env))
+    (swap! (first-frame env) #(assoc % _var _val))))
+
 
 ; ---- predicate ----
 (defn true? [x]
@@ -279,6 +275,9 @@
   (list (list 'car car)
         (list 'cdr cdr)
         (list 'cons cons)
+        (list 'map map)
+        (list '+ +)
+        (list '- -)
         (list 'null? nil?)))
 
 (def primitive-procedure-names
@@ -313,7 +312,7 @@
 (defn list-of-values [exps env]
   (if (no-operands? exps)
     '()
-    (map #(eval % env) (operands exps))))
+    (map #(eval % env) exps)))
 
 (defn eval-if [exp env]
   (if (true? (eval (if-predicate exp) env))
@@ -352,6 +351,7 @@
 ; eval
 (defn eval [exp env]
   (cond
+    (tagged-list? exp 'debug) (print env)
     (self-evaluating? exp) exp
     (variable? exp) (lookup-variable-value exp env)
     (quoted? exp) (text-of-quotation exp)
