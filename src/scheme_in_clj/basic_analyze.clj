@@ -1,4 +1,4 @@
-(ns scheme-in-clj.core)
+(ns scheme-in-clj.basic-analyze)
 
 ; ---- common function in Clojure form ----
 (defn car [s]
@@ -312,6 +312,7 @@
 ; procedure args
 (declare eval)
 (declare analyze)
+(declare execute-application)
 
 ; analyze exp
 (defn analyze-self-evaluating [exp]
@@ -367,6 +368,30 @@
     (fn [env]
       (make-procedure vars bproc env))))
 
+(defn analyze-application [exp]
+  (let [fproc (analyze (operator exp))
+        aprocs (map analyze (operands exp))]
+    (fn [env]
+      (execute-application (fproc env)
+                           (map (fn [aproc] (aproc env))
+                                aprocs)))))
+
+(defn analyze [exp]
+  (cond
+    (tagged-list? exp 'debug) (fn [env] (print env))
+    (self-evaluating? exp) (analyze-self-evaluating exp)
+    (variable? exp) (analyze-variable exp)
+    (quoted? exp) (analyze-quoted exp)
+    (assignment? exp) (analyze-assignment exp)
+    (definition? exp) (analyze-definition exp)
+    (if? exp) (analyze-if exp)
+    (lambda? exp) (analyze-lambda exp)
+    (begin? exp) (analyze-sequence (begin-actions exp))
+    (cond? exp) (analyze (cond->if exp))
+    (application? exp) (analyze-application exp)
+    :else (throw (Exception. (str "Unknow expression type -- ANALYZE" exp)))))
+
+
 ; sub eval
 (defn list-of-values [exps env]
   (if (no-operands? exps)
@@ -407,24 +432,18 @@
                                                                        (procedure-env procedure)))
     :else (throw (Exception. (str "Unknow procedure type -- APPLY" procedure)))))
 
+(defn execute-application [proc args]
+  (cond
+    (primitive-procedure? proc) (apply-primitive-procedure proc args)
+    (compound-procedure? proc) ((procedure-body proc)
+                                (extend-environment (procedure-parameters proc)
+                                                    args
+                                                    (procedure-env proc)))
+    :else (throw (Exception. (str "Unknown procedure type -- EXECUTE-APPLICATION" proc)))))
+
 ; eval
 (defn eval [exp env]
-  (cond
-    (tagged-list? exp 'debug) (print env)
-    (self-evaluating? exp) exp
-    (variable? exp) (lookup-variable-value exp env)
-    (quoted? exp) (text-of-quotation exp)
-    (assignment? exp) (eval-assignment exp env)
-    (definition? exp) (eval-definition exp env)
-    (if? exp) (eval-if exp env)
-    (lambda? exp) (make-procedure (lambda-parameters exp)
-                                  (lambda-body exp)
-                                  env)
-    (begin? exp) (eval-sequence (begin-actions exp) env)
-    (cond? exp) (eval (cond->if exp) env)
-    (application? exp) (apply (eval (operator exp) env)
-                              (list-of-values (operands exp) env))
-    :else (throw (Exception. (str "Unknow expression type -- EVAL" exp)))))
+  ((analyze exp) env))
 
 ; input and output
 (def input-prompt ";;; M-Eval input:")
@@ -454,4 +473,4 @@
   (recur))
 
 
-;(driver-loop)
+(driver-loop)
