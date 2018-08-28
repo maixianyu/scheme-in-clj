@@ -282,6 +282,8 @@
         (list '= =)
         (list '+ +)
         (list '- -)
+        (list '> >)
+        (list '< <)
         (list 'null? nil?)))
 
 (def primitive-procedure-names
@@ -378,7 +380,8 @@
 
 (defn analyze [exp]
   (cond
-    (tagged-list? exp 'debug) (fn [env] (print env))
+    (= exp 'debug) (fn [env] (print env))
+    (= exp 'exit) (System/exit 0)
     (self-evaluating? exp) (analyze-self-evaluating exp)
     (variable? exp) (analyze-variable exp)
     (quoted? exp) (analyze-quoted exp)
