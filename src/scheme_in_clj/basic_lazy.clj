@@ -311,6 +311,20 @@
 
 ; procedure args
 (declare eval)
+(declare actual-value)
+
+; thunk
+(defn delay-it [exp env]
+  (list 'thunk exp env))
+
+(defn thunk? [obj]
+  (tagged-list? obj 'thunk))
+
+(defn thunk-exp [thunk]
+  (cadr thunk))
+
+(defn thunk-env [thunk]
+  (caddr thunk))
 
 ; sub eval
 (defn list-of-values [exps env]
@@ -399,4 +413,4 @@
   (recur))
 
 
-(driver-loop)
+;(driver-loop)
