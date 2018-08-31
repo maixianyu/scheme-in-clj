@@ -315,25 +315,56 @@
 
 ; thunk
 (defn delay-it [exp env]
-  (list 'thunk exp env))
+  (list 'thunk (atom exp) (atom env) (atom false)))
 
 (defn thunk? [obj]
-  (tagged-list? obj 'thunk))
+  (and (tagged-list? obj 'thunk)
+       (false? @(cadddr obj))))
 
 (defn thunk-exp [thunk]
-  (cadr thunk))
+  @(cadr thunk))
 
 (defn thunk-env [thunk]
-  (caddr thunk))
+  @(caddr thunk))
+
+(defn evaluated-thunk? [obj]
+  (and (tagged-list? obj 'thunk)
+       (true? @(cadddr obj))))
+
+(defn thunk-value [evaluated-thunk]
+  @(cadr evaluated-thunk))
+
+(def tk (delay-it (+ 1 2) '()))
+(thunk? tk)
+(thunk-exp tk)
+(thunk-env tk)
+
+(defn force-it [obj]
+  (cond
+    (thunk? obj) (let [result (actual-value (thunk-exp obj)
+                                            (thunk-env obj))]
+                   (reset! (cadddr obj) true)
+                   (reset! (caddr obj) '())
+                   (reset! (cadr obj) result)
+                   result)
+    (evaluated-thunk? obj) (thunk-value obj)
+    :else obj))
+
+(force-it tk)
 
 ; sub eval
 (defn list-of-values [exps env]
   (if (no-operands? exps)
     '()
-    (map #(eval % env) exps)))
+    (map #(actual-value % env) exps)))
+
+(defn list-of-delayed-args [exps env]
+  (if (no-operands? exps)
+    '()
+    (map #(delay-it % env) exps)))
 
 (defn eval-if [exp env]
-  (if (true? (eval (if-predicate exp) env))
+  (if (true? (actual-value (if-predicate exp) env))
     (eval (if-consequent exp) env)
     (eval (if-alternative exp) env)))
 
@@ -356,13 +387,17 @@
     env)
   'ok)
 
+(defn actual-value [exp env]
+  (force-it (eval exp env)))
+
 ; apply
-(defn apply [procedure arguments]
+(defn apply [procedure arguments env]
   (cond
-    (primitive-procedure? procedure) (apply-primitive-procedure procedure arguments)
+    (primitive-procedure? procedure) (apply-primitive-procedure procedure
+                                                                (list-of-values arguments env))
     (compound-procedure? procedure) (eval-sequence (procedure-body procedure)
                                                    (extend-environment (procedure-parameters procedure)
-                                                                       arguments
+                                                                       (list-of-delayed-args arguments env)
                                                                        (procedure-env procedure)))
     :else (throw (Exception. (str "Unknow procedure type -- APPLY" procedure)))))
 
@@ -381,8 +416,9 @@
                                   env)
     (begin? exp) (eval-sequence (begin-actions exp) env)
     (cond? exp) (eval (cond->if exp) env)
-    (application? exp) (apply (eval (operator exp) env)
-                              (list-of-values (operands exp) env))
+    (application? exp) (apply (actual-value (operator exp) env)
+                              (operands exp)
+                              env)
     :else (throw (Exception. (str "Unknow expression type -- EVAL" exp)))))
 
 ; input and output
