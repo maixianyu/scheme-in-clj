@@ -1,4 +1,4 @@
-(ns scheme-in-clj.core)
+(ns scheme-in-clj.lazy)
 
 ; ---- common function in Clojure form ----
 (defn car [s]
@@ -282,6 +282,8 @@
         (list '= =)
         (list '+ +)
         (list '- -)
+        (list '> >)
+        (list '< <)
         (list 'null? nil?)))
 
 (def primitive-procedure-names
@@ -334,11 +336,6 @@
 (defn thunk-value [evaluated-thunk]
   @(cadr evaluated-thunk))
 
-(def tk (delay-it (+ 1 2) '()))
-(thunk? tk)
-(thunk-exp tk)
-(thunk-env tk)
-
 (defn force-it [obj]
   (cond
     (thunk? obj) (let [result (actual-value (thunk-exp obj)
@@ -349,8 +346,6 @@
                    result)
     (evaluated-thunk? obj) (thunk-value obj)
     :else obj))
-
-(force-it tk)
 
 ; sub eval
 (defn list-of-values [exps env]
@@ -370,9 +365,9 @@
 
 (defn eval-sequence [exps env]
   (if (last-exp? exps)
-    (eval (first-exp exps) env)
+    (force-it (first-exp exps) env)
     (do
-      (eval (first-exp exps) env)
+      (force-it (first-exp exps) env)
       (eval-sequence (rest-exps exps) env))))
 
 (defn eval-assignment [exp env]
@@ -449,4 +444,4 @@
   (recur))
 
 
-;(driver-loop)
+(driver-loop)
