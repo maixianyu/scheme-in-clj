@@ -275,9 +275,9 @@
   (cadr proc))
 
 (def primitive-procedures
-  (list (list 'car car)
+  (list (list 'cons cons)
+        (list 'car car)
         (list 'cdr cdr)
-        (list 'cons cons)
         (list 'map map)
         (list '= =)
         (list '+ +)
@@ -365,9 +365,9 @@
 
 (defn eval-sequence [exps env]
   (if (last-exp? exps)
-    (force-it (first-exp exps) env)
+    (eval (first-exp exps) env)
     (do
-      (force-it (first-exp exps) env)
+      (eval (first-exp exps) env)
       (eval-sequence (rest-exps exps) env))))
 
 (defn eval-assignment [exp env]
@@ -438,7 +438,7 @@
 (defn driver-loop []
   (prompt-for-input input-prompt)
   (let [input (read)]
-    (let [output (eval input the-global-environment)]
+    (let [output (actual-value input the-global-environment)]
       (announce-output output-prompt)
       (user-print output)))
   (recur))
